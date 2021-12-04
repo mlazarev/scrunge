@@ -24,7 +24,7 @@ import java.util.Scanner;
  * -- Can persist and pre-load previously scanned files in a map. This is useful for comparing multiple paths
  * -- Can output the duplicate list to a VLC playlist, so that you can manually check content before deletion
  * 
- * @author Mike
+ * @author Mike Lazarev
  * @date December 2021
  *
  */
