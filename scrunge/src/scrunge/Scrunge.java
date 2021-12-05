@@ -30,15 +30,17 @@ import java.util.Scanner;
  */
 public class Scrunge {
 
+	private final static String VERSION = "1.1"; 
+	
 	private static String ROOT_PATH = null;
 
 	private static String MAP_PATH;
 
 	private final static boolean RECURSIVE = true;
 
-	private static Map<Long, File> scanMap = new HashMap<Long, File>();
-	private static List<File[]> dupeList = new ArrayList<File[]>();
-	private static List<File[]> suspectList = new ArrayList<File[]>();
+	private static Map<Long, File> scanMap;
+	private final static List<File[]> dupeList = new ArrayList<File[]>();
+	private final static List<File[]> suspectList = new ArrayList<File[]>();
 
 	private static int filesProcessed;
 	private static long timeTaken;
@@ -46,6 +48,7 @@ public class Scrunge {
 	public static void main(String[] args) {
 		try {
 
+			System.out.println("--- SCRUNGE v" + VERSION + " ---");
 			Scanner reader = new Scanner(System.in);
 			String response;
 
@@ -72,11 +75,13 @@ public class Scrunge {
 			response = reader.nextLine();
 
 			if (response != null & response.equalsIgnoreCase("Yes")) {
-				Map<Long, File> mapInFile = MapUtils.preloadMap(MAP_PATH);
-				if (mapInFile != null)
-					scanMap = mapInFile;
+				scanMap = MapUtils.preloadMap(MAP_PATH);
 			}
 
+			// Couldn't load the map from file. Initialize.
+			if (scanMap == null) {
+				scanMap = new HashMap<Long, File>();
+			}
 			
 			// ----- SCAN ------------------------------------------------------------			
 
@@ -128,7 +133,7 @@ public class Scrunge {
 				}
 			}
 
-			System.out.print("Persist Map? <Yes/No> : ");
+			System.out.print("Persist Map? <Yes/[No]> : ");
 			response = reader.nextLine();
 			if (response != null & response.equalsIgnoreCase("Yes")) {
 				MapUtils.persistMap(MAP_PATH, scanMap);
@@ -301,8 +306,11 @@ public class Scrunge {
 		try {
 			FileOutputStream out = new FileOutputStream(outFile);
 			out.write(("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
-					+ "<playlist xmlns=\"http://xspf.org/ns/0/\" xmlns:vlc=\"http://www.videolan.org/vlc/playlist/ns/0/\" version=\"1\">\r\n"
-					+ "	<title>Playlist</title>\r\n" + "	<trackList>\r\n").getBytes());
+					+ "<playlist xmlns=\"http://xspf.org/ns/0/\" "
+					+ "xmlns:vlc=\"http://www.videolan.org/vlc/playlist/ns/0/\" "
+					+ "version=\"1\">\r\n"
+					+ "<title>Playlist</title>\r\n" 
+					+ "\t<trackList>\r\n").getBytes());
 
 			int id = 0;
 
@@ -311,15 +319,17 @@ public class Scrunge {
 				File[] files = it.next();
 
 				for (int i = 0; i < files.length; i++) {
-					out.write(("		<track>\r\n" + "			<location>file:///" + files[i].getAbsolutePath()
-							+ "</location>\r\n"
-							+ "			<extension application=\"http://www.videolan.org/vlc/playlist/0\">\r\n"
-							+ "				<vlc:id>" + id++ + "</vlc:id>\r\n" + "			</extension>\r\n"
-							+ "		</track>\r\n").getBytes());
+					out.write(("\t\t<track>\r\n" 
+							+ "\t\t\t<location>file:///" + files[i].getAbsolutePath() + "</location>\r\n"
+							+ "\t\t\t<extension application=\"http://www.videolan.org/vlc/playlist/0\">\r\n"
+							+ "\t\t\t\t<vlc:id>" + id++ + "</vlc:id>\r\n" 
+							+ "\t\t\t</extension>\r\n"
+							+ "\t\t</track>\r\n").getBytes());
 				}
 			}
 
-			out.write(("	</trackList>\r\n" + "</playlist>\r\n").getBytes());
+			out.write(("\t</trackList>\r\n" 
+					+ "</playlist>\r\n").getBytes());
 
 			out.flush();
 			out.close();
