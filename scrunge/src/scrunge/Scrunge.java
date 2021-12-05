@@ -30,11 +30,11 @@ import java.util.Scanner;
  */
 public class Scrunge {
 
-	private final static String VERSION = "1.1"; 
+	private final static String VERSION = "1.02"; 
 	
 	private static String ROOT_PATH = null;
-
-	private static String MAP_PATH;
+	private static String MAP_PATH = null;
+	private static final String MAP_FILENAME = "persist.scrunge";
 
 	private final static boolean RECURSIVE = true;
 
@@ -48,6 +48,10 @@ public class Scrunge {
 	public static void main(String[] args) {
 		try {
 
+			if (args.length == 1 ) {
+				MAP_PATH = args[0] + MAP_FILENAME;
+			}
+			
 			System.out.println("--- SCRUNGE v" + VERSION + " ---");
 			Scanner reader = new Scanner(System.in);
 			String response;
@@ -70,7 +74,9 @@ public class Scrunge {
 				System.out.println("Setting Path to [" + ROOT_PATH  + "]");
 			}
 			
-			MAP_PATH = ROOT_PATH + "persist.scrunge";
+			if (MAP_PATH == null ) {
+				MAP_PATH = ROOT_PATH + MAP_FILENAME;
+			}
 			System.out.print("Preload Map from " + MAP_PATH + "? <Yes/[No]> : ");
 			response = reader.nextLine();
 

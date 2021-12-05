@@ -6,7 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
- * 32 bits hashing function based on FNV-1 algorithm.
+ * 64-bit hashing function based on FNV-1 algorithm.
  *  
  * @see <a href="https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function">
  *       Wikipedia: Fowler–Noll–Vo hash function</a>
