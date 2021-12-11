@@ -27,10 +27,13 @@ import java.util.Scanner;
  * @author Mike Lazarev
  * @date December 2021
  *
+ * TODO: Add a preview of exactly which files are expected to be deleted to avoid accidental decision making
  */
 public class Scrunge {
 
-	private final static String VERSION = "1.02"; 
+	private final static String VERSION = "1.03"; 
+	
+	private final static boolean debug = false;
 	
 	private static String ROOT_PATH = null;
 	private static String MAP_PATH = null;
@@ -41,38 +44,41 @@ public class Scrunge {
 	private static Map<Long, File> scanMap;
 	private final static List<File[]> dupeList = new ArrayList<File[]>();
 	private final static List<File[]> suspectList = new ArrayList<File[]>();
+	private final static List<File[]> emptyList = new ArrayList<File[]>();
 
 	private static int filesProcessed;
 	private static long timeTaken;
 
+	/** Some files may be filled with zeros. Here's the typical hash that I get - might as well delete both! **/
+	private static final long EMPTY_FILE_HASH = -8275570426713795722L;
+	
+
 	public static void main(String[] args) {
 		try {
 
-			if (args.length == 1 ) {
-				MAP_PATH = args[0] + MAP_FILENAME;
+			if (args.length == 0 ) {
+				printHelp();
+				return;
 			}
+			
+			ROOT_PATH = args[0];
+			
+			if (args.length == 2)
+			{
+				MAP_PATH = args[1] + MAP_FILENAME;
+			}
+			
 			
 			System.out.println("--- SCRUNGE v" + VERSION + " ---");
 			Scanner reader = new Scanner(System.in);
 			String response;
 
+
+			
 			// ----- PROMPT FOR SETUP -------------------------------------------------
 			
-			System.out.print("Enter Root Path : ");
-			response = reader.nextLine();
-
-			if (response != null) {
-
-				if (response.trim() == "")
-				{
-					System.out.println("We need a root path. Can't continue. Aborting.");
-					reader.close();
-					return;
-				}
-				
-				ROOT_PATH = response;
-				System.out.println("Setting Path to [" + ROOT_PATH  + "]");
-			}
+			
+			System.out.println("Setting Path to [" + ROOT_PATH  + "]");
 			
 			if (MAP_PATH == null ) {
 				MAP_PATH = ROOT_PATH + MAP_FILENAME;
@@ -104,6 +110,8 @@ public class Scrunge {
 			printSummary();
 			printDetails(dupeList, "DUPE", true);
 			printDetails(suspectList, "SUSPECT", false);
+			printDetails(emptyList, "EMPTY", false);
+			
 			printDone();
 
 			// ----- PROMPT FOR FOLLOW UPS -------------------------------------------------
@@ -113,7 +121,7 @@ public class Scrunge {
 				response = reader.nextLine();
 
 				if (response != null & response.equalsIgnoreCase("Yes")) {
-					deleteDupes();
+					deleteFiles(dupeList);
 				}
 
 				if (response != null & !response.equalsIgnoreCase("Yes")) {
@@ -138,6 +146,23 @@ public class Scrunge {
 					writeVLCPlaylist(suspectList, "suspects");
 				}
 			}
+			
+			if (emptyList.size() > 0) {
+				System.out.print("Show Empty Files? <Yes/[No]> : ");
+				response = reader.nextLine();
+				if (response != null & response.equalsIgnoreCase("Yes")) {
+					printDetails(emptyList, "EMPTY", true);
+				}
+
+				System.out.print("Delete Empty Files? <Yes/[No]> : ");
+				response = reader.nextLine();
+
+				if (response != null & response.equalsIgnoreCase("Yes")) {
+					deleteFiles(emptyList);
+				}
+			}
+			
+			
 
 			System.out.print("Persist Map? <Yes/[No]> : ");
 			response = reader.nextLine();
@@ -182,8 +207,16 @@ public class Scrunge {
 	private static void processFile(File file) {
 		filesProcessed++;
 
-		long hash = HashUtils.getHash(file, 0);
+		long hash = HashUtils.getHash(file, 0, false);
 
+		if (hash == EMPTY_FILE_HASH) {
+			File[] files = new File[2];
+			files[0] = file;
+			files[1] = file;
+			emptyList.add(files);
+			return;
+		}
+		
 		File previous = scanMap.get(hash);
 
 		if (previous != null) {
@@ -200,6 +233,15 @@ public class Scrunge {
 			pair[0] = previous;
 			pair[1] = file;
 
+			if (debug)
+			{
+				// Compute hash one more time just to make sure..
+				long hash1 = HashUtils.getHash(file, 0, true);
+				long hash2 = HashUtils.getHash(previous, 0, true);
+
+				System.out.println("Found Two Files: hash1=[" + hash1 + "]" + " hash2=[" + hash2 + "]");
+			}
+			
 			dupeList.add(pair);
 		} else {
 			scanMap.put(hash, file);
@@ -219,8 +261,8 @@ public class Scrunge {
 			// Let's test somewhere in the middle
 			long offset = file1.length() / 2;
 
-			long hash1 = HashUtils.getHash(file1, offset);
-			long hash2 = HashUtils.getHash(file2, offset);
+			long hash1 = HashUtils.getHash(file1, offset, false);
+			long hash2 = HashUtils.getHash(file2, offset, false);
 
 			if (hash1 != hash2) {
 				it.remove();
@@ -230,6 +272,10 @@ public class Scrunge {
 	}
 
 
+	private static void printHelp() {
+		System.out.println("Usage: scrunge <root path> <map path>\n");
+	}
+	
 
 	private static void printSummary() {
 		System.out.println("------------------- SUMMARY ------------------- ");
@@ -247,14 +293,36 @@ public class Scrunge {
 		Iterator<File[]> it = list.iterator();
 		while (it.hasNext()) {
 			File[] pair = it.next();
-			File fileOne = pair[0];
-			File fileTwo = pair[1];
+			File file1 = pair[0];
+			File file2 = pair[1];
 
+			File toDelete = null;
+			
+			try
+			{
+				// This will determine the newer file that we will delete, so show it in the print out
+				BasicFileAttributes attr1 = Files.readAttributes(file1.toPath(), BasicFileAttributes.class);
+				BasicFileAttributes attr2 = Files.readAttributes(file2.toPath(), BasicFileAttributes.class);
+				toDelete = (attr1.creationTime().compareTo(attr2.creationTime()) > 0) ? file1 : file2;
+			} catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+			
 			if (printDetails) {
-				System.out.println("  [" + fileOne.getAbsolutePath() + "] --> [" + fileTwo.getAbsolutePath() + "]");
+				
+				if (file1 == toDelete)
+				{
+					System.out.println("  -[" + file1.getAbsolutePath() + "]- == +[" + file2.getAbsolutePath() + "]+");	
+				} else
+				{
+					System.out.println("  +[" + file1.getAbsolutePath() + "]+ == -[" + file2.getAbsolutePath() + "]-");	
+				}
+				
+				
 			}
 
-			fileSize += fileTwo.length();
+			fileSize += file2.length();
 		}
 
 		if (list.size() == 0) {
@@ -277,8 +345,8 @@ public class Scrunge {
 		System.out.println("------------------- DONE ------------------- ");
 	}
 
-	private static void deleteDupes() {
-		Iterator<File[]> it = dupeList.iterator();
+	private static void deleteFiles(List<File[]> list) {
+		Iterator<File[]> it = list.iterator();
 		while (it.hasNext()) {
 
 			File[] pair = it.next();
@@ -309,6 +377,8 @@ public class Scrunge {
 
 		System.out.println("Creating the playlist as " + outFile.getAbsolutePath());
 
+		// TODO - An ampersand inside the tag needs to be escaped, otherwise VLC chokes
+		
 		try {
 			FileOutputStream out = new FileOutputStream(outFile);
 			out.write(("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"

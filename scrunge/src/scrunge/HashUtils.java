@@ -18,7 +18,7 @@ public class HashUtils {
 	
 	private final static int CHUNK_SIZE = 1024;
 	
-	static long getHash(File file, long offset) {
+	static long getHash(File file, long offset, boolean debug) {
 		byte[] scratch = new byte[CHUNK_SIZE];
 
 		try {
@@ -28,7 +28,14 @@ public class HashUtils {
 				fin.skip(offset);
 			}
 
-			fin.read(scratch);
+			int bytesRead = fin.read(scratch);
+			
+			if (debug) {
+				System.out.println("Read " + bytesRead + " bytes");
+				String hex = bytesToHex(scratch);
+				System.out.println("[" + hex + "]");
+			}
+			
 			fin.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -56,4 +63,16 @@ public class HashUtils {
 		hash += hash << 5;
 		return hash;
 	}
+	
+	private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+	public static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for (int j = 0; j < bytes.length; j++) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+	        hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+	    }
+	    return new String(hexChars);
+	}
+	
 }
